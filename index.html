@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Grammar World Game</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --sky1:#5ec8ff;--sky2:#b8ecff;--ink:#1d2340;--card:#ffffff;--muted:#5d6488;
+  --red:#ff4d5e;--green:#2ecc71;--blue:#3a86ff;--yellow:#ffd23f;--purple:#9b5de5;--orange:#ff8c42;
+  --shadow:0 6px 0 rgba(0,0,0,.18);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:'Fredoka',system-ui,sans-serif;color:var(--ink);background:linear-gradient(var(--sky1),var(--sky2));font-size:clamp(16px,1.25vw,26px);overflow-x:hidden;-webkit-tap-highlight-color:transparent;user-select:none}
+input,textarea,select,button{font:inherit;color:inherit}
+textarea,input{user-select:text}
+button{cursor:pointer;border:0}
+.screen{min-height:100vh;display:flex;flex-direction:column}
+.clouds{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.cloud{position:absolute;background:#fff;border-radius:999px;opacity:.75;filter:blur(1px);animation:drift linear infinite}
+.cloud::before,.cloud::after{content:"";position:absolute;background:#fff;border-radius:50%}
+.cloud::before{width:55%;height:160%;left:15%;top:-70%}
+.cloud::after{width:40%;height:130%;left:48%;top:-45%}
+@keyframes drift{from{transform:translateX(-30vw)}to{transform:translateX(130vw)}}
+.wrap{position:relative;z-index:1}
+
+/* buttons */
+.btn{background:var(--blue);color:#fff;border-radius:16px;padding:.55em 1.1em;font-weight:600;box-shadow:var(--shadow);transition:transform .08s}
+.btn:active{transform:translateY(4px);box-shadow:0 2px 0 rgba(0,0,0,.18)}
+.btn.big{font-size:1.5em;padding:.6em 1.6em;border-radius:22px}
+.btn.green{background:var(--green)}.btn.red{background:var(--red)}.btn.yellow{background:var(--yellow);color:var(--ink)}
+.btn.purple{background:var(--purple)}.btn.white{background:#fff;color:var(--ink)}.btn.orange{background:var(--orange)}
+.btn.small{font-size:.8em;padding:.35em .8em;border-radius:12px}
+.btn[disabled]{opacity:.45;pointer-events:none}
+
+/* top bar */
+.topbar{display:flex;align-items:center;gap:.8em;padding:.6em 1em;background:rgba(255,255,255,.85);box-shadow:0 4px 0 rgba(0,0,0,.08);position:relative;z-index:5;flex-wrap:wrap}
+.topbar .title{font-weight:700;font-size:1.15em;margin-right:auto}
+.teams{display:flex;gap:.5em;flex-wrap:wrap}
+.team{display:flex;align-items:center;gap:.4em;padding:.25em .5em .25em .7em;border-radius:14px;color:#fff;font-weight:600;box-shadow:var(--shadow)}
+.team .sc{background:rgba(255,255,255,.25);border-radius:10px;padding:0 .45em}
+.team button{background:rgba(255,255,255,.3);color:#fff;border-radius:8px;width:1.5em;height:1.5em;line-height:1;font-weight:700}
+
+/* home */
+.home{align-items:center;justify-content:center;gap:1.2em;padding:2em 1em;text-align:center}
+.logo{font-size:clamp(34px,5vw,96px);font-weight:700;color:#fff;text-shadow:0 6px 0 #1d6fd8,0 10px 20px rgba(0,0,0,.2);line-height:1}
+.logo small{display:block;font-size:.4em;color:var(--yellow);text-shadow:0 4px 0 #b8860b}
+.panel{background:var(--card);border-radius:24px;padding:1.2em 1.4em;box-shadow:0 8px 0 rgba(0,0,0,.12);max-width:1100px;width:100%}
+.story{font-size:1.1em;color:var(--muted)}
+.setup{display:flex;gap:1em;flex-wrap:wrap;justify-content:center;align-items:center}
+.setup input{border:3px solid #dfe4f5;border-radius:12px;padding:.3em .6em;width:9em;text-align:center;font-weight:600}
+.setup select{border:3px solid #dfe4f5;border-radius:12px;padding:.3em .6em;font-weight:600;background:#fff}
+.row{display:flex;gap:.8em;justify-content:center;flex-wrap:wrap;align-items:center}
+
+/* map */
+.mapwrap{flex:1;display:flex;align-items:center;justify-content:center;padding:1em}
+.map{position:relative;width:min(96vw,calc((100vh - 120px)*16/9));aspect-ratio:16/9}
+.map svg{position:absolute;inset:0;width:100%;height:100%}
+.island{position:absolute;transform:translate(-50%,-50%);width:13%;text-align:center;animation:bob 4s ease-in-out infinite}
+.island .top{position:relative;height:0;padding-bottom:42%;border-radius:50%;box-shadow:0 1.2vw 0 #8b5a2b,0 2vw 0 #6b4220,0 2.6vw 1.6vw rgba(0,0,0,.25)}
+.island .ico{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2.4vw}
+.island .lbl{margin-top:2.6vw;background:#fff;border-radius:12px;padding:.2em .5em;font-weight:600;font-size:.85em;box-shadow:var(--shadow);display:inline-block;white-space:nowrap}
+.island .lvl{position:absolute;top:-1.1em;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:10px;padding:0 .5em;font-size:.75em;font-weight:700;white-space:nowrap}
+.island.locked{filter:grayscale(.9) brightness(.9);opacity:.7}
+.island.locked .ico::after{content:"🔒";position:absolute;font-size:1.4vw;right:8%;top:-10%}
+.island.next{animation:bob 4s ease-in-out infinite,glow 1.2s ease-in-out infinite alternate}
+@keyframes glow{to{filter:drop-shadow(0 0 1.2vw #fff6a8)}}
+.island.done .stars{position:absolute;top:-2.4vw;left:0;right:0;font-size:1.3vw}
+@keyframes bob{50%{margin-top:-.6vw}}
+.portal .top{background:radial-gradient(circle,#fff 0 10%,#c77dff 25%,#7b2cbf 55%,#3c096c 75%) !important}
+.portal.open .top{animation:spin 2s linear infinite}
+@keyframes spin{to{filter:hue-rotate(360deg)}}
+
+/* blocky avatar */
+.avatar{position:absolute;width:4.2%;transform:translate(-50%,-100%);transition:left .9s ease-in-out,top .9s ease-in-out;z-index:3;pointer-events:none}
+.avatar .b{position:relative;animation:idle 1.6s ease-in-out infinite}
+.avatar.hop .b{animation:hop .45s ease-in-out 2}
+@keyframes idle{50%{transform:translateY(-6%)}}
+@keyframes hop{50%{transform:translateY(-55%)}}
+.av{position:relative;width:100%;padding-bottom:180%}
+.av div{position:absolute;border-radius:12%}
+.av .hd{left:22%;width:56%;top:0;height:31%;background:#ffd23f;box-shadow:inset -3px -3px 0 rgba(0,0,0,.12)}
+.av .hd::before,.av .hd::after{content:"";position:absolute;top:38%;width:14%;height:22%;background:#1d2340;border-radius:2px}
+.av .hd::before{left:24%}.av .hd::after{right:24%}
+.av .tr{left:14%;width:72%;top:32%;height:34%;background:var(--blue);box-shadow:inset -3px -3px 0 rgba(0,0,0,.15)}
+.av .al{left:-6%;width:20%;top:32%;height:32%;background:#ffd23f}
+.av .ar{right:-6%;width:20%;top:32%;height:32%;background:#ffd23f}
+.av .ll{left:14%;width:35%;top:66%;height:33%;background:var(--green)}
+.av .lr{right:14%;width:35%;top:66%;height:33%;background:var(--green)}
+
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(20,25,60,.55);display:flex;align-items:center;justify-content:center;z-index:50;padding:1em;animation:fade .2s}
+.modal .panel{max-width:900px;animation:pop .25s}
+@keyframes fade{from{opacity:0}}
+@keyframes pop{from{transform:scale(.85)}}
+.badges{display:flex;gap:.5em;flex-wrap:wrap;justify-content:center;margin:.5em 0}
+.tag{display:inline-block;border-radius:10px;padding:.15em .6em;font-weight:600;color:#fff;font-size:.9em}
+h1,h2,h3{margin:.2em 0}
+
+/* mission */
+.mission{flex:1;padding:1em;display:flex;flex-direction:column;gap:1em;align-items:center}
+.mission .panel{max-width:1500px}
+.timer{font-weight:700;background:var(--ink);color:#fff;border-radius:12px;padding:.2em .7em;min-width:4.5em;text-align:center}
+.timer.over{background:var(--red);animation:pulse .6s infinite alternate}
+@keyframes pulse{to{transform:scale(1.1)}}
+.task{font-size:1.1em;color:var(--muted);text-align:center}
+.q{font-size:2em;font-weight:600;text-align:center;margin:.4em 0}
+.opts{display:flex;gap:1em;justify-content:center;flex-wrap:wrap}
+.opt{background:#fff;border:4px solid #dfe4f5;border-radius:20px;padding:.5em 1.4em;font-size:1.6em;font-weight:600;box-shadow:var(--shadow);min-width:6em}
+.opt.ok{background:var(--green);border-color:var(--green);color:#fff}
+.opt.no{background:var(--red);border-color:var(--red);color:#fff;animation:shake .4s}
+.opt.sel{border-color:var(--blue);background:#e3eeff}
+@keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.obby{position:relative;height:9em;width:100%;max-width:1300px;margin:0 auto}
+.plat{position:absolute;bottom:1.2em;width:9%;height:1.4em;border-radius:8px;transform:translateX(-50%);box-shadow:0 .5em 0 rgba(0,0,0,.2)}
+.lava{position:absolute;left:0;right:0;bottom:0;height:1.1em;border-radius:10px;background:repeating-linear-gradient(90deg,#ff5f1f 0 30px,#ff9e1f 30px 60px);animation:lava 1.5s linear infinite;opacity:.85}
+@keyframes lava{to{background-position:60px 0}}
+.obby .avatar{width:5%;bottom:2.6em;top:auto;transform:translateX(-50%)}
+.coin{position:absolute;font-size:2em;animation:coin 0.9s ease-out forwards;pointer-events:none;z-index:60}
+@keyframes coin{to{transform:translateY(-120px);opacity:0}}
+.prog{font-weight:600;color:var(--muted)}
+
+.qlist{display:grid;gap:.7em;width:100%}
+.qitem{display:flex;align-items:center;gap:1em;background:#f5f7ff;border-radius:16px;padding:.5em .8em;flex-wrap:wrap}
+.qitem .qt{flex:1;font-size:1.25em;font-weight:500;min-width:10em}
+.qitem .opt{font-size:1.1em;padding:.3em .9em;min-width:4.5em;border-radius:14px}
+.qitem.right{background:#dcfce7}.qitem.wrong{background:#ffe1e4}
+.two{display:grid;grid-template-columns:1.1fr 1fr;gap:1em;width:100%}
+@media (max-width:900px){.two{grid-template-columns:1fr}}
+.text{font-size:1.3em;line-height:1.7;background:#fffbea;border-radius:16px;padding:.8em 1em;border:3px dashed #f5d76e}
+.sent{border-radius:8px;padding:0 .1em;transition:background .2s}
+.picking .sent{cursor:pointer;background:rgba(58,134,255,.08)}
+.picking .sent:hover{background:rgba(58,134,255,.25)}
+.sent.hl-ok{background:#bbf7d0}.sent.hl-no{background:#fecaca}.sent.hl-sel{background:#bfdbfe}
+.find{background:#f5f7ff;border-radius:16px;padding:.5em .8em;margin-top:.6em;border:3px solid transparent}
+.find.active{border-color:var(--blue)}
+.find .ans{font-style:italic;color:var(--muted);margin-top:.3em}
+.find.right{background:#dcfce7}.find.wrong{background:#ffe1e4}
+.scard{background:#f5f7ff;border-radius:16px;padding:.5em .8em;display:flex;flex-direction:column;gap:.3em}
+.scard .top{display:flex;align-items:center;gap:.5em}
+.scard .qt{flex:1;font-size:1.2em;font-weight:500}
+.scard .tr{color:var(--blue);font-style:italic;min-height:1.2em}
+.scard.heard{background:#dcfce7}
+.iconbtn{width:2.2em;height:2.2em;border-radius:12px;background:#fff;box-shadow:var(--shadow);font-size:1.1em}
+.iconbtn.rec{background:var(--red);color:#fff;animation:pulse .5s infinite alternate}
+.col h3{display:flex;align-items:center;gap:.4em}
+textarea.write{width:100%;min-height:9em;border:4px solid #dfe4f5;border-radius:16px;padding:.6em;font-size:1.3em;resize:vertical}
+.chips{display:flex;gap:.5em;flex-wrap:wrap}
+.chip{background:#eef2ff;border-radius:12px;padding:.3em .7em;font-weight:500;box-shadow:0 3px 0 rgba(0,0,0,.08)}
+.check{display:flex;gap:.6em;flex-wrap:wrap;margin:.5em 0}
+.check span{border-radius:10px;padding:.2em .6em;background:#f1f1f1;font-weight:500}
+.check span.on{background:#bbf7d0}
+.field{display:flex;gap:.5em;align-items:center;flex-wrap:wrap;margin:.3em 0}
+.field input{border:3px solid #dfe4f5;border-radius:12px;padding:.3em .6em;flex:1;min-width:6em}
+.selfb{display:flex;gap:.8em;justify-content:center;flex-wrap:wrap}
+.selfb button{font-size:1.2em;padding:.5em 1em;border-radius:16px;background:#fff;border:4px solid #dfe4f5;box-shadow:var(--shadow)}
+.selfb button.sel{border-color:var(--ink)}
+.pts{display:flex;align-items:center;gap:.6em;justify-content:center;font-size:2em;font-weight:700}
+.pick{display:flex;gap:.6em;flex-wrap:wrap;justify-content:center}
+.pick button{border-radius:14px;padding:.4em .9em;font-weight:600;color:#fff;opacity:.4;box-shadow:var(--shadow);font-size:1.1em}
+.pick button.on{opacity:1;outline:4px solid var(--ink)}
+.rubric{background:#fffbea;border-radius:14px;padding:.5em .9em;color:#6b5a00;font-size:.95em;white-space:pre-line;text-align:left}
+
+/* final */
+.board{display:grid;gap:.6em;margin:1em 0}
+.brow{display:flex;align-items:center;gap:1em;border-radius:16px;padding:.5em 1em;color:#fff;font-size:1.4em;font-weight:600;box-shadow:var(--shadow)}
+.brow .n{margin-right:auto}
+canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:80}
+
+/* editor */
+.editor{padding:1em;gap:1em;align-items:center;user-select:text}
+.editor .panel{max-width:1200px}
+.ed label{display:block;font-weight:600;font-size:.85em;color:var(--muted);margin-top:.5em}
+.ed input,.ed select,.ed textarea{width:100%;border:3px solid #dfe4f5;border-radius:12px;padding:.35em .6em;background:#fff;font-size:.95em}
+.ed textarea{min-height:5.5em;font-family:ui-monospace,Consolas,monospace;font-size:.85em}
+.ed .g{display:grid;grid-template-columns:2fr 2fr 1.5fr 1.2fr .8fr .8fr;gap:.6em}
+@media (max-width:900px){.ed .g{grid-template-columns:1fr 1fr}}
+.mcard{border:3px solid #dfe4f5;border-radius:18px;padding:.8em 1em;margin:.8em 0;background:#fbfcff}
+.mcard .hd{display:flex;align-items:center;gap:.5em}
+.mcard .hd b{margin-right:auto;font-size:1.1em}
+.hint{font-size:.8em;color:var(--muted);background:#f3f5ff;border-radius:10px;padding:.4em .7em;margin-top:.3em;white-space:pre-line}
+.toast{position:fixed;bottom:1.2em;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:.6em 1.2em;border-radius:14px;z-index:99;animation:fade .2s;max-width:90vw;text-align:center}
+</style>
+</head>
+<body>
+<div class="clouds" id="clouds"></div>
+<div id="app" class="wrap"></div>
+<canvas id="fx"></canvas>
+<script>
+/* ============ helpers ============ */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const clone=o=>JSON.parse(JSON.stringify(o));
+function toast(t,ms=2200){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),ms)}
+const TEAM_COLORS=['#ff4d5e','#3a86ff','#2ecc71','#9b5de5','#ff8c42','#00b4d8'];
+const ISLAND_COLORS=['#7bd389','#5ec8ff','#ffd23f','#ff8fab','#b388ff','#ffb347','#66e3c4','#f4a261'];
+const TYPES={
+  choice:{label:'Grammar',icon:'⚡',color:'#ff8c42'},
+  listening:{label:'Listening',icon:'🎧',color:'#3a86ff'},
+  reading:{label:'Reading',icon:'📖',color:'#2ecc71'},
+  speaking:{label:'Speaking',icon:'🎤',color:'#ff4d5e'},
+  writing:{label:'Writing',icon:'✏️',color:'#9b5de5'},
+  reflection:{label:'Reflection',icon:'🏁',color:'#1d2340'}
+};
+const WORK_COLORS={Individual:'#00b4d8',Pair:'#ff8fab',Group:'#ffb347'};
+
+/* clouds */
+(function(){const c=$('#clouds');for(let i=0;i<6;i++){const d=document.createElement('div');d.className='cloud';const w=120+Math.random()*200;d.style.cssText=`width:${w}px;height:${w*.35}px;top:${5+Math.random()*60}%;animation-duration:${60+Math.random()*60}s;animation-delay:-${Math.random()*90}s`;c.appendChild(d)}})();
+
+/* ============ sound ============ */
+let AC=null;
+function tone(f,d=.12,type='square',v=.08,when=0){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const t=AC.currentTime+when;const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g).connect(AC.destination);o.start(t);o.stop(t+d)}catch(e){}}
+const SFX={
+  coin(){tone(988,.08);tone(1319,.25,'square',.08,.08)},
+  wrong(){tone(180,.3,'sawtooth',.09);tone(140,.35,'sawtooth',.08,.12)},
+  jump(){try{AC=AC||new AudioContext();const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();o.type='square';o.frequency.setValueAtTime(300,t);o.frequency.exponentialRampToValueAtTime(900,t+.18);g.gain.setValueAtTime(.06,t);g.gain.exponentialRampToValueAtTime(.0001,t+.2);o.connect(g).connect(AC.destination);o.start(t);o.stop(t+.2)}catch(e){}},
+  win(){[523,659,784,1047,1319].forEach((f,i)=>tone(f,.25,'triangle',.1,i*.12))},
+  click(){tone(660,.05,'triangle',.05)},
+  alarm(){[0,.25,.5].forEach(w=>tone(880,.15,'square',.08,w))}
+};
+
+/* ============ speech ============ */
+function speak(text,rate=.88){if(!('speechSynthesis' in window)){toast('Бұл браузерде дыбыс жоқ');return}speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='en-US';u.rate=rate;const vs=speechSynthesis.getVoices();const v=vs.find(v=>/en[-_]US/i.test(v.lang)&&/female|samantha|zira|google us/i.test(v.name))||vs.find(v=>/en[-_](US|GB)/i.test(v.lang))||vs.find(v=>/^en/i.test(v.lang));if(v)u.voice=v;speechSynthesis.speak(u);return u}
+if('speechSynthesis' in window)speechSynthesis.onvoiceschanged=()=>{};
+let REC=null;
+function listen(onText,onEnd){const R=window.SpeechRecognition||window.webkitSpeechRecognition;if(!R){toast('Микрофон үшін Chrome және интернет керек');onEnd&&onEnd();return null}
+  try{REC&&REC.stop()}catch(e){}
+  const r=new R();r.lang='en-US';r.interimResults=true;r.continuous=false;
+  r.onresult=e=>{let t='';for(const x of e.results)t+=x[0].transcript;onText(t)};
+  r.onerror=e=>{toast(e.error==='not-allowed'?'Микрофонға рұқсат беріңіз':e.error==='network'?'Интернет керек':'Mic: '+e.error)};
+  r.onend=()=>{REC=null;onEnd&&onEnd()};r.start();REC=r;return r}
+
+/* ============ default lesson (Present Simple) ============ */
+const DEFAULT_LESSON={
+ id:'present-simple',title:'Present Simple — Grammar World',
+ story:'Welcome to Grammar World! The players have entered a virtual world. To unlock the main portal, they must complete 5 missions, collect coins and earn XP.',
+ missions:[
+  {name:'Grammar Power-up',place:'Spawn Point',type:'choice',work:'Individual',points:1,minutes:3,rules:'5=1',
+   task:'Choose the correct answer. Move forward on the platforms for every correct answer.',
+   items:[
+    {q:'My brother ___ football every day.',opts:['play','plays'],a:1},
+    {q:'We ___ to school at 8 o\'clock.',opts:['go','goes'],a:0},
+    {q:'She ___ TV in the morning.',opts:['don\'t watch','doesn\'t watch'],a:1},
+    {q:'___ your mother work at a school?',opts:['Do','Does'],a:1},
+    {q:'Tom ___ his homework after school.',opts:['do','does'],a:1},
+    {q:'I ___ milk for breakfast.',opts:['drinks','drink'],a:1}]},
+  {name:'Listening Challenge',place:'Sound Island',type:'listening',work:'Group',points:2,minutes:4,rules:'4=1, 6=2',
+   task:'Listen to the audio twice. Work with your team and choose True or False.',
+   script:'Hi! My name is Alex. I am 11 years old. I live in a small town. I get up at 7 o\'clock. I have breakfast with my family. I go to school at 8. I play football after school. I don\'t play computer games every day. I read books before I go to bed.',
+   items:[
+    {q:'Alex is 12 years old.',opts:['True','False'],a:1},
+    {q:'He gets up at 7 o\'clock.',opts:['True','False'],a:0},
+    {q:'He has breakfast alone.',opts:['True','False'],a:1},
+    {q:'He plays football after school.',opts:['True','False'],a:0},
+    {q:'He plays computer games every day.',opts:['True','False'],a:1},
+    {q:'He reads books before bed.',opts:['True','False'],a:0}]},
+  {name:'Reading',place:'Reading Cave',type:'reading',work:'Individual',points:2,minutes:4,rules:'3=1, 5=2',
+   task:'Read the text. Choose the correct answer and find sentences in the text.',
+   textTitle:'Emma\'s Daily Life',
+   text:'Emma lives in London. She is a student. She wakes up at 7:00 every morning. She usually walks to school with her friend. Her lessons start at 8:30. Emma likes English and Science, but she doesn\'t like Maths. After school, she helps her mother and does her homework. On Saturdays, she visits her grandmother. She sometimes watches films with her family in the evening.',
+   items:[
+    {q:'Emma lives in …',opts:['London','Paris'],a:0},
+    {q:'She goes to school …',opts:['by car','on foot'],a:1},
+    {q:'Her lessons start at …',opts:['7:00','8:30'],a:1}],
+   finds:[
+    {q:'One sentence with doesn\'t.',key:'doesn\'t'},
+    {q:'One sentence with Present Simple — he/she/it + verb-s.',key:'lives/wakes/walks/likes/helps/does/visits/watches'}]},
+  {name:'Speaking Mission',place:'Duo Bridge',type:'speaking',work:'Pair',points:2,minutes:4,
+   task:'Ask and answer the questions. Then switch roles. Try to cross the bridge together!',
+   a:['What time do you get up?','Do you eat breakfast every day?','How do you go to school?','What do you do after school?','Do you play computer games?','What time do you go to bed?'],
+   b:['Do you help your parents?','What do you do at weekends?','Do you like English?','Does your best friend play football?','Does your mother work?','What do you do in the evening?'],
+   rubric:'1 point — asks at least 3 questions and answers them correctly.\n1 point — uses Present Simple correctly and speaks clearly.\nChallenge: each player uses at least one question with DOES and one with DO.'},
+  {name:'Writing Mission',place:'Builder\'s Lab',type:'writing',work:'Group',points:2,minutes:5,minSent:5,
+   task:'Create your avatar\'s daily routine. Write 5–6 sentences about your character.',
+   prompts:['He/She gets up at …','He/She goes to …','He/She has …','He/She plays …','He/She doesn\'t …','He/She likes …'],
+   example:'Leo gets up at 7 o\'clock. He goes to school every day. He has lunch at 1 o\'clock. He plays football after school. He doesn\'t play video games in the morning. He reads books at night.',
+   rubric:'1 point — 4–5 understandable sentences in Present Simple.\n2 points — 5–6 sentences, correct he/she + -s, negatives and vocabulary.'},
+  {name:'Unlock the Portal',place:'Portal',type:'reflection',work:'Individual',points:1,minutes:3,
+   task:'Exit Ticket: complete the sentences and choose your badge.',
+   items:['Today I learned …','I can use Present Simple to …']}
+ ]};
+
+/* ============ state ============ */
+let LESSONS=store.get('egw_lessons',null);
+if(!LESSONS||!LESSONS.length){LESSONS=[clone(DEFAULT_LESSON)];store.set('egw_lessons',LESSONS)}
+let G=store.get('egw_game',null); // {lessonId, teams:[{name,color,xp,coins}], done:{}, pos}
+const saveG=()=>store.set('egw_game',G);
+const saveL=()=>store.set('egw_lessons',LESSONS);
+const lessonById=id=>LESSONS.find(l=>l.id===id)||LESSONS[0];
+let curLessonId=(G&&G.lessonId)||LESSONS[0].id;
+let timerInt=null;
+
+let CONF=0;
+function stopAll(){CONF++;const c=document.getElementById('fx');if(c)c.getContext('2d').clearRect(0,0,c.width,c.height);clearInterval(timerInt);try{speechSynthesis.cancel()}catch(e){}try{REC&&REC.stop()}catch(e){}}
+
+/* ============ HOME ============ */
+function home(){stopAll();
+  const L=lessonById(curLessonId);
+  const teams=(G&&G.teams)||[{name:'Team 1'},{name:'Team 2'},{name:'Team 3'}];
+  const cont=G&&G.lessonId===L.id&&Object.keys(G.done||{}).length;
+  $('#app').innerHTML=`<div class="screen home">
+   <div class="logo">${esc(L.title.split('—')[1]||'Grammar World')}<small>${esc(L.title.split('—')[0])}</small></div>
+   <div class="panel"><div class="story">${esc(L.story)}</div>
+    <div class="badges">${L.missions.map((m,i)=>`<span class="tag" style="background:${TYPES[m.type].color}">${TYPES[m.type].icon} ${esc(m.place)}</span>`).join('')}</div></div>
+   <div class="panel">
+    <div class="setup">
+     <b>Lesson:</b><select id="lessonSel">${LESSONS.map(l=>`<option value="${esc(l.id)}" ${l.id===L.id?'selected':''}>${esc(l.title)}</option>`).join('')}</select>
+    </div>
+    <div class="setup" style="margin-top:.8em"><b>Teams:</b>
+     <select id="tcount">${[1,2,3,4,5,6].map(n=>`<option ${n===teams.length?'selected':''}>${n}</option>`).join('')}</select>
+     <span id="tnames">${teams.map((t,i)=>`<input value="${esc(t.name)}" style="border-color:${TEAM_COLORS[i]}">`).join('')}</span>
+    </div>
+   </div>
+   <div class="row">
+    ${cont?`<button class="btn big yellow" id="contBtn">▶ Continue</button>`:''}
+    <button class="btn big green" id="startBtn">${cont?'🔄 New game':'▶ Start game'}</button>
+    <button class="btn white" id="edBtn">👩‍🏫 Мұғалім беті</button>
+   </div></div>`;
+  $('#lessonSel').onchange=e=>{curLessonId=e.target.value;home()};
+  $('#tcount').onchange=e=>{const n=+e.target.value;const cur=$$('#tnames input').map(i=>i.value);$('#tnames').innerHTML=Array.from({length:n},(_,i)=>`<input value="${esc(cur[i]||'Team '+(i+1))}" style="border-color:${TEAM_COLORS[i]}">`).join('')};
+  $('#startBtn').onclick=()=>{if(cont&&!confirm('Start a new game? Scores will reset.'))return;
+    G={lessonId:L.id,teams:$$('#tnames input').map((inp,i)=>({name:inp.value.trim()||'Team '+(i+1),color:TEAM_COLORS[i],xp:0,coins:0})),done:{},pos:-1};saveG();SFX.win();map()};
+  if(cont)$('#contBtn').onclick=()=>map();
+  $('#edBtn').onclick=()=>editor();
+}
+
+/* ============ top bar ============ */
+function teamsHTML(){return G.teams.map((t,i)=>`<div class="team" style="background:${t.color}">${esc(t.name)} <span class="sc">⭐ ${t.xp}</span><span class="sc">🪙 ${t.coins}</span><button data-t="${i}" data-d="-1">−</button><button data-t="${i}" data-d="1">+</button></div>`).join('')}
+function bindTeams(){$$('.team button').forEach(b=>b.onclick=()=>{const t=G.teams[+b.dataset.t];t.xp=Math.max(0,t.xp+ +b.dataset.d);saveG();if(+b.dataset.d>0)SFX.coin();$('.teams').innerHTML=teamsHTML();bindTeams()})}
+
+/* ============ MAP ============ */
+function islandPos(i,n){ // i in -1..n (n = portal)
+  if(i<0)return {x:4.5,y:80};
+  const x=15+i*(78/Math.max(1,n));const y=i%2?30:66;return {x,y:i===n?42:y}}
+function map(){stopAll();
+  const L=lessonById(G.lessonId);const n=L.missions.length-(L.missions[L.missions.length-1].type==='reflection'?1:0);
+  // reflection mission lives in the portal
+  const ms=L.missions;const nextIdx=ms.findIndex((m,i)=>!G.done[i]);
+  const pts=[islandPos(-1,n)];for(let i=0;i<=n;i++)pts.push(islandPos(i,n));
+  const allMainDone=ms.slice(0,n).every((m,i)=>G.done[i]);
+  const avPos=islandPos(G.pos,n);
+  $('#app').innerHTML=`<div class="screen">
+   <div class="topbar"><button class="btn small white" id="homeBtn">🏠</button><div class="title">${esc(L.title)}</div><div class="teams">${teamsHTML()}</div></div>
+   <div class="mapwrap"><div class="map" id="map">
+    <svg viewBox="0 0 100 56.25" preserveAspectRatio="none"><defs><linearGradient id="rb" x1="0" x2="1"><stop offset="0" stop-color="#ff4d5e"/><stop offset=".25" stop-color="#ffd23f"/><stop offset=".5" stop-color="#2ecc71"/><stop offset=".75" stop-color="#3a86ff"/><stop offset="1" stop-color="#9b5de5"/></linearGradient></defs>
+     <polyline points="${pts.map(p=>p.x+','+p.y*.5625).join(' ')}" fill="none" stroke="url(#rb)" stroke-width="1.1" stroke-dasharray="1.6 1.2" stroke-linecap="round" opacity=".9"/></svg>
+    <div class="island" style="left:4.5%;top:80%;width:7%"><div class="top" style="background:#cfd8e3"><div class="ico" style="font-size:1.6vw">🚩</div></div><div class="lbl">Start</div></div>
+    ${ms.slice(0,n).map((m,i)=>{const p=islandPos(i,n);const done=G.done[i];const locked=!done&&i!==nextIdx;
+      return `<div class="island ${done?'done':''} ${locked?'locked':''} ${i===nextIdx?'next':''}" data-i="${i}" style="left:${p.x}%;top:${p.y}%;animation-delay:-${i*.7}s">
+       <div class="lvl">LEVEL ${i+1}</div>${done?`<div class="stars">${'⭐'.repeat(Math.max(1,done.pts||0))}</div>`:''}
+       <div class="top" style="background:${ISLAND_COLORS[i%8]}"><div class="ico">${TYPES[m.type].icon}</div></div>
+       <div class="lbl">${esc(m.place)}</div></div>`}).join('')}
+    ${(()=>{const p=islandPos(n,n);return `<div class="island portal ${allMainDone?'open next':'locked'}" data-i="portal" style="left:${p.x}%;top:${p.y}%"><div class="lvl">FINAL</div><div class="top"><div class="ico">🌀</div></div><div class="lbl">${esc(ms[n]?ms[n].place:'Portal')}</div></div>`})()}
+    <div class="avatar" id="av" style="left:${avPos.x}%;top:${avPos.y-3}%"><div class="b">${avatarHTML()}</div></div>
+   </div></div></div>`;
+  $('#homeBtn').onclick=home;bindTeams();
+  $$('.island[data-i]').forEach(el=>el.onclick=()=>{
+    const v=el.dataset.i;
+    if(v==='portal'){if(!allMainDone){toast('Complete all missions to unlock the portal!');SFX.wrong();return}
+      if(ms[n])intro(n);else final();return}
+    const i=+v;if(!G.done[i]&&i!==nextIdx){toast('Locked! Finish Level '+(nextIdx+1)+' first');SFX.wrong();return}
+    intro(i)});
+}
+function avatarHTML(){return `<div class="av"><div class="al"></div><div class="ar"></div><div class="ll"></div><div class="lr"></div><div class="tr"></div><div class="hd"></div></div>`}
+function hopTo(i){const L=lessonById(G.lessonId);const n=L.missions.length-(L.missions[L.missions.length-1].type==='reflection'?1:0);
+  const av=$('#av');if(!av)return;const p=islandPos(Math.min(i,n),n);av.classList.add('hop');SFX.jump();setTimeout(SFX.jump,450);
+  requestAnimationFrame(()=>{av.style.left=p.x+'%';av.style.top=(p.y-3)+'%'});setTimeout(()=>av.classList.remove('hop'),950)}
+
+/* ============ mission intro ============ */
+function intro(i){const L=lessonById(G.lessonId);const m=L.missions[i];const T=TYPES[m.type];SFX.click();
+  modal(`<h1 style="text-align:center">${T.icon} ${esc(m.place)}</h1>
+   <div class="badges"><span class="tag" style="background:${T.color}">${T.label}</span><span class="tag" style="background:${WORK_COLORS[m.work]||'#888'}">${esc(m.work)} work</span><span class="tag" style="background:#1d2340">⭐ ${m.points} point${m.points>1?'s':''}</span><span class="tag" style="background:#555">⏱ ${m.minutes} min</span></div>
+   <h2 style="text-align:center">${esc(m.name)}</h2><p class="task">${esc(m.task)}</p>
+   <div class="row"><button class="btn white" onclick="closeModal()">Back</button><button class="btn big green" id="goBtn">▶ GO!</button></div>`);
+  $('#goBtn').onclick=()=>{closeModal();mission(i)}}
+function modal(html){closeModal();const d=document.createElement('div');d.className='modal';d.id='modal';d.innerHTML=`<div class="panel">${html}</div>`;document.body.appendChild(d)}
+function closeModal(){const m=$('#modal');if(m)m.remove()}
+
+/* ============ MISSION shell ============ */
+function mission(i){stopAll();const L=lessonById(G.lessonId);const m=L.missions[i];const T=TYPES[m.type];
+  $('#app').innerHTML=`<div class="screen">
+   <div class="topbar"><button class="btn small white" id="backBtn">🗺 Map</button>
+    <div class="title">${T.icon} Level ${i+1} · ${esc(m.place)} <span class="tag" style="background:${T.color}">${T.label}</span> <span class="tag" style="background:${WORK_COLORS[m.work]||'#888'}">${esc(m.work)}</span></div>
+    <div class="timer" id="timer"></div><div class="teams">${teamsHTML()}</div></div>
+   <div class="mission"><div class="task">${esc(m.task)}</div><div class="panel" id="mbody"></div></div></div>`;
+  $('#backBtn').onclick=()=>{if(confirm('Back to the map? Progress in this mission will be lost.'))map()};bindTeams();
+  let left=(+m.minutes||3)*60;const tk=()=>{const t=$('#timer');if(!t)return clearInterval(timerInt);const s=Math.abs(left);t.textContent=(left<0?'-':'')+Math.floor(s/60)+':'+String(s%60).padStart(2,'0');t.classList.toggle('over',left<=0);if(left===0)SFX.alarm();left--};tk();timerInt=setInterval(tk,1000);
+  const body=$('#mbody');
+  ({choice:mChoice,listening:mListening,reading:mReading,speaking:mSpeaking,writing:mWriting,reflection:mReflection})[m.type](m,body,(res)=>score(i,res));
+}
+function suggest(m,correct,total){const rules=parseRules(m.rules);if(rules.length){let p=0;rules.forEach(([n,pt])=>{if(correct>=n)p=Math.max(p,pt)});return Math.min(p,m.points)}return Math.round(m.points*correct/Math.max(1,total))}
+function parseRules(s){return String(s||'').split(/[,;]/).map(x=>x.split('=').map(y=>parseFloat(y))).filter(a=>a.length===2&&!isNaN(a[0])&&!isNaN(a[1]))}
+function coinFx(el){const r=(el||document.body).getBoundingClientRect();const c=document.createElement('div');c.className='coin';c.textContent='🪙';c.style.left=(r.left+r.width/2-16)+'px';c.style.top=(r.top)+'px';document.body.appendChild(c);setTimeout(()=>c.remove(),900)}
+
+/* --- choice: obby platforms --- */
+function mChoice(m,body,done){let k=0,correct=0;const N=m.items.length;
+  const draw=()=>{const it=m.items[k];
+    body.innerHTML=`<div class="prog" style="text-align:center">Question ${k+1} / ${N} · 🪙 ${correct}</div>
+     <div class="obby" id="obby"><div class="lava"></div>${Array.from({length:N+1},(_,j)=>`<div class="plat" style="left:${6+j*(88/N)}%;background:${j===N?'#ffd23f':ISLAND_COLORS[j%8]}">${j===N?'<span style="position:absolute;top:-1.6em;left:30%">🏆</span>':''}</div>`).join('')}
+      <div class="avatar" id="oav" style="left:${6+k*(88/N)}%"><div class="b">${avatarHTML()}</div></div></div>
+     <div class="q">${esc(it.q).replace('___','<span style="color:var(--blue)">_____</span>')} <button class="iconbtn" id="say">🔊</button></div>
+     <div class="opts">${it.opts.map((o,j)=>`<button class="opt" data-j="${j}">${String.fromCharCode(97+j)}) ${esc(o)}</button>`).join('')}</div>`;
+    $('#say').onclick=()=>speak(it.q.replace(/_+/g,'blank'));
+    $$('.opt').forEach(b=>b.onclick=()=>{$$('.opt').forEach(x=>x.disabled=true);const j=+b.dataset.j;
+      if(j===it.a){b.classList.add('ok');correct++;SFX.coin();coinFx(b);const av=$('#oav');av.classList.add('hop');SFX.jump();setTimeout(()=>{av.style.transition='left .5s';av.style.left=(6+(k+1)*(88/N))+'%'},50)}
+      else{b.classList.add('no');SFX.wrong();$$('.opt')[it.a].classList.add('ok')}
+      setTimeout(()=>{k++;if(k<N)draw();else done({correct,total:N,pts:suggest(m,correct,N)})},1400)})};
+  draw()}
+
+/* --- choice list (used by listening & reading) --- */
+function qListHTML(items,prefix){return items.map((it,k)=>`<div class="qitem" id="${prefix}${k}"><div class="qt">${k+1}. ${esc(it.q)}</div>${it.opts.map((o,j)=>`<button class="opt" data-k="${k}" data-j="${j}">${esc(o)}</button>`).join('')}</div>`).join('')}
+function bindQList(prefix,answers){$$(`[id^="${prefix}"] .opt`).forEach(b=>b.onclick=()=>{const k=+b.dataset.k;answers[k]=+b.dataset.j;SFX.click();$$(`#${prefix}${k} .opt`).forEach(x=>x.classList.toggle('sel',x===b))})}
+function markQList(prefix,items,answers){let c=0;items.forEach((it,k)=>{const ok=answers[k]===it.a;if(ok)c++;const row=$('#'+prefix+k);row.classList.add(ok?'right':'wrong');$$(`#${prefix}${k} .opt`).forEach((x,j)=>{x.disabled=true;x.classList.remove('sel');if(j===it.a)x.classList.add('ok');else if(j===answers[k])x.classList.add('no')})});return c}
+
+/* --- listening --- */
+function mListening(m,body,done){let plays=0;const ans={};
+  body.innerHTML=`<div class="row" style="margin-bottom:.8em"><button class="btn big blue" id="play">▶ Play audio <span id="pc">(0/2)</span></button><button class="btn small white" id="slow">🐢 Slow</button><button class="btn small white" id="scr">📄 Script</button></div>
+   <div id="script" class="text" style="display:none;margin-bottom:1em">${esc(m.script)}</div>
+   <div class="qlist">${qListHTML(m.items,'lq')}</div>
+   <div class="row" style="margin-top:1em"><button class="btn big green" id="chk">✔ Check answers</button></div>`;
+  const play=r=>{plays++;$('#pc').textContent=`(${plays}/2)`;speak(m.script,r)};
+  $('#play').onclick=()=>play(.88);$('#slow').onclick=()=>play(.7);
+  $('#scr').onclick=()=>{const s=$('#script');s.style.display=s.style.display==='none'?'block':'none'};
+  bindQList('lq',ans);
+  $('#chk').onclick=()=>{if(Object.keys(ans).length<m.items.length&&!confirm('Not all answers are chosen. Check anyway?'))return;
+    speechSynthesis.cancel();const c=markQList('lq',m.items,ans);c===m.items.length?SFX.win():SFX.coin();
+    $('#chk').outerHTML=`<button class="btn big yellow" id="fin">Next ➜</button>`;$('#fin').onclick=()=>done({correct:c,total:m.items.length,pts:suggest(m,c,m.items.length)})}}
+
+/* --- reading --- */
+function splitSent(t){return (t.match(/[^.!?]+[.!?]+["')]*\s*|[^.!?]+$/g)||[t]).map(s=>s.trim()).filter(Boolean)}
+function mReading(m,body,done){const ans={};const finds=m.finds||[];const picked={};let active=finds.length?0:-1;
+  const sents=splitSent(m.text);
+  body.innerHTML=`<div class="two"><div><h2>${esc(m.textTitle||'')} <button class="iconbtn" id="rd">🔊</button></h2><div class="text" id="rtext">${sents.map((s,i)=>`<span class="sent" data-s="${i}">${esc(s)}</span> `).join('')}</div></div>
+   <div><h3>A. Choose the correct answer</h3><div class="qlist">${qListHTML(m.items||[],'rq')}</div>
+    ${finds.length?`<h3 style="margin-top:.8em">B. Find in the text <small style="color:var(--muted)">(tap a task, then tap a sentence)</small></h3>${finds.map((f,k)=>`<div class="find" data-f="${k}" id="fd${k}"><b>${(m.items||[]).length+k+1}. ${esc(f.q)}</b><div class="ans" id="fa${k}">…</div></div>`).join('')}`:''}
+   </div></div><div class="row" style="margin-top:1em"><button class="btn big green" id="chk">✔ Check answers</button></div>`;
+  $('#rd').onclick=()=>speak(m.text,.85);
+  bindQList('rq',ans);
+  const setActive=k=>{active=k;$$('.find').forEach(f=>f.classList.toggle('active',+f.dataset.f===k));$('#rtext').classList.toggle('picking',k>=0)};
+  setActive(active);
+  $$('.find').forEach(f=>f.onclick=()=>setActive(+f.dataset.f));
+  $$('.sent').forEach(s=>s.onclick=()=>{if(active<0)return;picked[active]=+s.dataset.s;$('#fa'+active).textContent='“'+sents[+s.dataset.s]+'”';SFX.click();
+    $$('.sent').forEach(x=>x.classList.toggle('hl-sel',Object.values(picked).includes(+x.dataset.s)));
+    const nx=finds.findIndex((f,k)=>picked[k]===undefined);setActive(nx)});
+  $('#chk').onclick=()=>{let c=markQList('rq',m.items||[],ans);
+    finds.forEach((f,k)=>{const s=picked[k]!==undefined?sents[picked[k]].toLowerCase():'';const keys=String(f.key||'').toLowerCase().split('/').map(x=>x.trim()).filter(Boolean);
+      const ok=!!s&&(!keys.length||keys.some(kw=>new RegExp('\\b'+kw.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b').test(s)));if(ok)c++;$('#fd'+k).classList.add(ok?'right':'wrong');
+      if(picked[k]!==undefined)$(`.sent[data-s="${picked[k]}"]`).classList.add(ok?'hl-ok':'hl-no')});
+    $$('.sent.hl-ok').forEach(x=>x.classList.remove('hl-no'));
+    $$('.sent').forEach(x=>x.classList.remove('hl-sel'));setActive(-1);const tot=(m.items||[]).length+finds.length;c===tot?SFX.win():SFX.coin();
+    $('#chk').outerHTML=`<button class="btn big yellow" id="fin">Next ➜</button>`;$('#fin').onclick=()=>done({correct:c,total:tot,pts:suggest(m,c,tot)})}}
+
+/* --- speaking --- */
+function mSpeaking(m,body,done){const heard={};
+  const col=(arr,who,key)=>`<div class="col"><h3><span class="tag" style="background:${who==='A'?'#3a86ff':'#ff4d5e'}">Player ${who}</span> asks Player ${who==='A'?'B':'A'}</h3><div class="qlist">${arr.map((q,k)=>`<div class="scard" id="sc${key}${k}"><div class="top"><div class="qt">${esc(q)}</div><button class="iconbtn" data-say="${key}${k}">🔊</button><button class="iconbtn" data-mic="${key}${k}">🎤</button></div><div class="tr" id="tr${key}${k}"></div></div>`).join('')}</div></div>`;
+  body.innerHTML=`<div class="row" style="margin-bottom:.6em"><div class="tag" style="background:#1d2340">🌉 Bridge: <span id="bridge">0</span> / ${m.a.length+m.b.length}</div></div>
+   <div class="two" style="grid-template-columns:1fr 1fr">${col(m.a,'A','a')}${col(m.b,'B','b')}</div>
+   ${m.rubric?`<div class="rubric" style="margin-top:1em">${esc(m.rubric)}</div>`:''}
+   <div class="row" style="margin-top:1em"><button class="btn big green" id="fin">✔ Finish</button></div>`;
+  const qs={};m.a.forEach((q,k)=>qs['a'+k]=q);m.b.forEach((q,k)=>qs['b'+k]=q);
+  $$('[data-say]').forEach(b=>b.onclick=()=>speak(qs[b.dataset.say]));
+  $$('[data-mic]').forEach(b=>b.onclick=()=>{const id=b.dataset.mic;if(b.classList.contains('rec')){try{REC.stop()}catch(e){}return}
+    $$('[data-mic]').forEach(x=>x.classList.remove('rec'));b.classList.add('rec');
+    listen(t=>{$('#tr'+id).textContent='🗣 '+t},()=>{b.classList.remove('rec');if($('#tr'+id).textContent.trim()&&!heard[id]){heard[id]=1;$('#sc'+id).classList.add('heard');SFX.coin();coinFx(b);$('#bridge').textContent=Object.keys(heard).length}})});
+  // tap on the card text = teacher marks as answered (works without mic)
+  $$('.scard .qt').forEach(q=>q.onclick=()=>{const id=q.closest('.scard').id.slice(2);if(heard[id]){delete heard[id];q.closest('.scard').classList.remove('heard')}else{heard[id]=1;q.closest('.scard').classList.add('heard');SFX.coin()}$('#bridge').textContent=Object.keys(heard).length});
+  $('#fin').onclick=()=>{const c=Object.keys(heard).length,tot=m.a.length+m.b.length;done({correct:c,total:tot,pts:c>=tot?m.points:c>=Math.ceil(tot/4)?Math.min(1,m.points):0,manual:true,rubric:m.rubric})}}
+
+/* --- writing --- */
+function mWriting(m,body,done){
+  body.innerHTML=`<div class="two"><div>
+     <h2>🧍 Meet our avatar!</h2>
+     <div class="field"><b>Name:</b><input id="wn" placeholder="Leo"><b>Age:</b><input id="wa" style="max-width:5em"></div>
+     <div class="field"><b>Likes:</b><input id="wl"></div>
+     <h3>Tap a prompt to add it:</h3><div class="chips">${m.prompts.map((p,k)=>`<button class="chip" data-p="${k}">${esc(p)}</button>`).join('')}</div>
+     ${m.example?`<details style="margin-top:.8em"><summary><b>Example</b></summary><div class="text" style="font-size:1.05em">${esc(m.example)}</div></details>`:''}
+     ${m.rubric?`<div class="rubric" style="margin-top:.8em">${esc(m.rubric)}</div>`:''}
+    </div><div>
+     <h3>✏️ Team writing space</h3><textarea class="write" id="wt" placeholder="Write your sentences here..."></textarea>
+     <div class="check" id="wc"></div>
+     <div class="row"><button class="btn white" id="wsay">🔊 Read our story</button><button class="btn big green" id="fin">✔ Finish</button></div>
+    </div></div>`;
+  const ta=$('#wt');
+  $$('.chip').forEach(c=>c.onclick=()=>{const nm=$('#wn').value.trim();let p=m.prompts[+c.dataset.p].replace(/He\/She/g,nm||'He').replace(/\s*…\s*$/,' ').replace(/\.\.\.$/,' ');
+    ta.value=(ta.value.trim()?ta.value.trim()+' ':'')+p;ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);upd()});
+  const upd=()=>{const t=ta.value;const s=splitSent(t).filter(x=>x.split(/\s+/).length>=3);
+    const neg=/\b(doesn't|don't|does not|do not)\b/i.test(t);const third=/\b(he|she|it|[A-Z][a-z]+)\s+(\w+s)\b/.test(t);
+    $('#wc').innerHTML=`<span class="${s.length>=(m.minSent||5)?'on':''}">📝 Sentences: ${s.length}</span><span class="${third?'on':''}">he/she + -s</span><span class="${neg?'on':''}">doesn't / don't</span>`;return {n:s.length,neg,third}};
+  ta.oninput=upd;upd();
+  $('#wsay').onclick=()=>speak(ta.value||'Write something first!');
+  $('#fin').onclick=()=>{const r=upd();const ms=m.minSent||5;const p=r.n>=ms&&r.third&&r.neg?m.points:r.n>=Math.max(1,ms-1)?Math.min(1,m.points):0;
+    done({correct:r.n,total:ms,pts:p,manual:true,rubric:m.rubric,label:'sentences'})}}
+
+/* --- reflection --- */
+function mReflection(m,body,done){let badge=null;
+  body.innerHTML=`<h2 style="text-align:center">🎟 Exit Ticket</h2>
+   ${m.items.map((s,k)=>`<div class="field"><b>${k+1}. ${esc(s.replace(/[_…]+\.?$/,''))}</b><input class="rf"></div>`).join('')}
+   <div class="field"><b>${m.items.length+1}. My score is</b> <span class="tag" style="background:#1d2340">${G.teams.map(t=>esc(t.name)+': '+t.xp).join(' · ')}</span></div>
+   <h3 style="text-align:center;margin-top:1em">Self-assessment badge</h3>
+   <div class="selfb"><button data-b="EASY">🟢 EASY — I understand!</button><button data-b="MEDIUM">🟡 MEDIUM — I need practice.</button><button data-b="HARD">🔴 HARD — Help me!</button></div>
+   <div class="row" style="margin-top:1em"><button class="btn big green" id="fin">🌀 Unlock the Portal</button></div>`;
+  $$('.selfb button').forEach(b=>b.onclick=()=>{badge=b.dataset.b;SFX.click();$$('.selfb button').forEach(x=>x.classList.toggle('sel',x===b))});
+  $('#fin').onclick=()=>{const filled=$$('.rf').filter(i=>i.value.trim()).length;done({correct:filled+(badge?1:0),total:m.items.length+1,pts:m.points,manual:true,label:'answers',final:true})}}
+
+/* ============ scoring ============ */
+let lastPick=[0];
+function score(i,res){stopAll();const L=lessonById(G.lessonId);const m=L.missions[i];let pts=res.pts;const pick=new Set(lastPick.filter(x=>x<G.teams.length));
+  modal(`<h1 style="text-align:center">🎉 Mission complete!</h1>
+   <p style="text-align:center;font-size:1.3em">${res.label==='sentences'?'Sentences':res.label==='answers'?'Answers':'Correct'}: <b>${res.correct} / ${res.total}</b> &nbsp; 🪙 +${res.correct}</p>
+   ${res.rubric?`<div class="rubric">${esc(res.rubric)}</div>`:''}
+   <div class="pts" style="margin:.4em 0"><button class="btn red" id="pm">−</button>⭐ <span id="pv">${pts}</span> / ${m.points}<button class="btn green" id="pp">+</button></div>
+   <p style="text-align:center;margin:.3em">Who gets the points?</p>
+   <div class="pick">${G.teams.map((t,k)=>`<button data-k="${k}" style="background:${t.color}" class="${pick.has(k)?'on':''}">${esc(t.name)}</button>`).join('')}</div>
+   <div class="row" style="margin-top:1em"><button class="btn white" id="again">↺ Play again</button><button class="btn big yellow" id="give">Give points ➜</button></div>`);
+  $('#pm').onclick=()=>{pts=Math.max(0,pts-1);$('#pv').textContent=pts};$('#pp').onclick=()=>{pts=Math.min(m.points,pts+1);$('#pv').textContent=pts};
+  $$('.pick button').forEach(b=>b.onclick=()=>{const k=+b.dataset.k;pick.has(k)?pick.delete(k):pick.add(k);b.classList.toggle('on')});
+  $('#again').onclick=()=>{closeModal();mission(i)};
+  $('#give').onclick=()=>{if(!pick.size){toast('Choose a team');return}
+    pick.forEach(k=>{G.teams[k].xp+=pts;G.teams[k].coins+=res.correct});lastPick=[...pick];
+    const prev=G.done[i];G.done[i]={pts:Math.max(pts,prev?prev.pts:0)};const firstTime=!prev;if(firstTime)G.pos=i;saveG();closeModal();SFX.win();
+    if(res.final){final();return}
+    map();if(firstTime){const av=$('#av');const L2=lessonById(G.lessonId);const n=L2.missions.length-(L2.missions[L2.missions.length-1].type==='reflection'?1:0);const p=islandPos(i-1,n);av.style.transition='none';av.style.left=p.x+'%';av.style.top=(p.y-3)+'%';av.offsetWidth;av.style.transition='';setTimeout(()=>hopTo(i),250)}}}
+
+/* ============ final ============ */
+function final(){stopAll();const L=lessonById(G.lessonId);const sorted=[...G.teams].sort((a,b)=>b.xp-a.xp||b.coins-a.coins);const max=L.missions.reduce((s,m)=>s+(+m.points||0),0);
+  $('#app').innerHTML=`<div class="screen home">
+   <div class="logo">🌀 PORTAL UNLOCKED!<small>${esc(L.title)}</small></div>
+   <div class="panel"><h2>🏆 ${esc(sorted[0].name)} wins!</h2>
+    <div class="board">${sorted.map((t,k)=>`<div class="brow" style="background:${t.color}"><span>${['🥇','🥈','🥉'][k]||'🏅'}</span><span class="n">${esc(t.name)}</span><span>⭐ ${t.xp} / ${max}</span><span>🪙 ${t.coins}</span></div>`).join('')}</div></div>
+   <div class="row"><button class="btn white" id="mapBtn">🗺 Map</button><button class="btn big green" id="homeBtn">🏠 Home</button></div></div>`;
+  $('#mapBtn').onclick=map;$('#homeBtn').onclick=home;SFX.win();confetti()}
+function confetti(){const c=$('#fx'),x=c.getContext('2d');c.width=innerWidth;c.height=innerHeight;const P=Array.from({length:220},()=>({x:Math.random()*c.width,y:-20-Math.random()*c.height*.6,vx:(Math.random()-.5)*4,vy:2+Math.random()*4,r:Math.random()*6,c:TEAM_COLORS[Math.floor(Math.random()*6)],a:Math.random()*6}));let f=0;const id=CONF;
+  (function t(){if(id!==CONF)return;x.clearRect(0,0,c.width,c.height);P.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.a+=.1;x.save();x.translate(p.x,p.y);x.rotate(p.a);x.fillStyle=p.c;x.fillRect(-5,-3,10,6);x.restore()});if(++f<260)requestAnimationFrame(t);else x.clearRect(0,0,c.width,c.height)})()}
+
+/* ============ TEACHER EDITOR ============ */
+const fmtChoice=items=>(items||[]).map(it=>{if(it.opts.length===2&&it.opts[0]==='True'&&it.opts[1]==='False')return it.q+' | '+(it.a===0?'T':'F');return it.q+' | '+it.opts.map((o,j)=>(j===it.a?'*':'')+o).join(' | ')}).join('\n');
+function parseChoice(txt){return txt.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const p=l.split('|').map(s=>s.trim());
+  if(p.length===2&&/^(t|f|true|false)$/i.test(p[1]))return {q:p[0],opts:['True','False'],a:/^t/i.test(p[1])?0:1};
+  const opts=p.slice(1);let a=opts.findIndex(o=>o.startsWith('*'));if(a<0)a=0;return {q:p[0],opts:opts.map(o=>o.replace(/^\*/,'').trim()),a}}).filter(it=>it.opts.length>=2)}
+const lines=t=>t.split('\n').map(l=>l.trim()).filter(Boolean);
+const HINT_CHOICE='Әр жол = 1 сұрақ.  Сұрақ | жауап | *дұрыс жауап\nМысалы:  My brother ___ football. | play | *plays\nTrue/False үшін:  Alex is 12 years old. | F';
+function typeFields(m,i){const t=m.type;
+  if(t==='choice')return `<label>Сұрақтар</label><textarea name="items" rows="7">${esc(fmtChoice(m.items))}</textarea><div class="hint">${HINT_CHOICE}</div>`;
+  if(t==='listening')return `<label>Аудио мәтіні (ойын өзі дауыстап оқиды)</label><textarea name="script" rows="4" style="font-family:inherit">${esc(m.script||'')}</textarea>
+    <label>Сұрақтар</label><textarea name="items" rows="6">${esc(fmtChoice(m.items))}</textarea><div class="hint">${HINT_CHOICE}</div>`;
+  if(t==='reading')return `<label>Мәтін тақырыбы</label><input name="textTitle" value="${esc(m.textTitle||'')}">
+    <label>Мәтін</label><textarea name="text" rows="5" style="font-family:inherit">${esc(m.text||'')}</textarea>
+    <label>A. Таңдау сұрақтары</label><textarea name="items" rows="4">${esc(fmtChoice(m.items))}</textarea><div class="hint">${HINT_CHOICE}</div>
+    <label>B. Мәтіннен табу</label><textarea name="finds" rows="3">${esc((m.finds||[]).map(f=>f.q+(f.key?' | '+f.key:'')).join('\n'))}</textarea><div class="hint">Тапсырма | кілт сөз (бірнешеу болса / арқылы)\nМысалы:  One sentence with doesn't. | doesn't\nКілт сөз жазбасаңыз, кез келген сөйлем дұрыс саналады.</div>`;
+  if(t==='speaking')return `<div class="g" style="grid-template-columns:1fr 1fr"><div><label>Player A сұрақтары (әр жол = 1 сұрақ)</label><textarea name="a" rows="6" style="font-family:inherit">${esc((m.a||[]).join('\n'))}</textarea></div>
+    <div><label>Player B сұрақтары</label><textarea name="b" rows="6" style="font-family:inherit">${esc((m.b||[]).join('\n'))}</textarea></div></div>
+    <label>Бағалау критерийі (оқушыларға көрінеді)</label><textarea name="rubric" rows="3" style="font-family:inherit">${esc(m.rubric||'')}</textarea>`;
+  if(t==='writing')return `<label>Көмекші сөздер (әр жол = 1, He/She орнына аватар аты қойылады)</label><textarea name="prompts" rows="5" style="font-family:inherit">${esc((m.prompts||[]).join('\n'))}</textarea>
+    <label>Үлгі мәтін</label><textarea name="example" rows="3" style="font-family:inherit">${esc(m.example||'')}</textarea>
+    <div class="g" style="grid-template-columns:1fr 3fr"><div><label>Ең аз сөйлем саны</label><input name="minSent" type="number" min="1" value="${m.minSent||5}"></div>
+    <div><label>Бағалау критерийі</label><textarea name="rubric" rows="2" style="font-family:inherit">${esc(m.rubric||'')}</textarea></div></div>`;
+  if(t==='reflection')return `<label>Exit ticket сөйлемдері (әр жол = 1)</label><textarea name="items" rows="3" style="font-family:inherit">${esc((m.items||[]).join('\n'))}</textarea><div class="hint">Бұл миссия соңғы порталда болады (тізімде ең соңында тұрса).</div>`;
+  return ''}
+let ED=null; // working copy
+function editor(){stopAll();ED=clone(lessonById(curLessonId));renderEditor()}
+function renderEditor(){
+  $('#app').innerHTML=`<div class="screen editor">
+   <div class="topbar" style="width:100%"><button class="btn small white" id="eHome">🏠</button><div class="title">👩‍🏫 Мұғалім беті</div>
+    <select id="eSel" style="border:3px solid #dfe4f5;border-radius:12px;padding:.25em .5em">${LESSONS.map(l=>`<option value="${esc(l.id)}" ${l.id===ED.id?'selected':''}>${esc(l.title)}</option>`).join('')}</select>
+    <button class="btn small" id="eNew">＋ Жаңа сабақ</button><button class="btn small purple" id="eDup">⧉ Көшірме</button>
+    <button class="btn small white" id="eExp">⬇ Файлға сақтау</button><button class="btn small white" id="eImp">⬆ Файлдан ашу</button><input type="file" id="eFile" accept=".json" hidden>
+    <button class="btn small red" id="eDel">🗑</button></div>
+   <div class="panel ed">
+    <div class="g" style="grid-template-columns:1fr"><div><label>Сабақ атауы (мысалы: Present Simple — Grammar World)</label><input id="eTitle" value="${esc(ED.title)}"></div>
+    <div><label>Аңыз / кіріспе (басты бетте көрінеді)</label><textarea id="eStory" rows="2" style="font-family:inherit">${esc(ED.story||'')}</textarea></div></div>
+    <div id="mlist">${ED.missions.map((m,i)=>`<div class="mcard" data-i="${i}">
+     <div class="hd"><b>${TYPES[m.type].icon} Level ${i+1}</b><button class="btn small white" data-up="${i}">↑</button><button class="btn small white" data-dn="${i}">↓</button><button class="btn small red" data-rm="${i}">✕</button></div>
+     <div class="g">
+      <div><label>Орын (аралдың аты)</label><input name="place" value="${esc(m.place)}"></div>
+      <div><label>Миссия атауы</label><input name="name" value="${esc(m.name)}"></div>
+      <div><label>Тапсырма түрі</label><select name="type">${Object.entries(TYPES).map(([k,v])=>`<option value="${k}" ${k===m.type?'selected':''}>${v.icon} ${v.label}</option>`).join('')}</select></div>
+      <div><label>Жұмыс түрі</label><select name="work">${['Individual','Pair','Group'].map(w=>`<option ${w===m.work?'selected':''}>${w}</option>`).join('')}</select></div>
+      <div><label>Ұпай</label><input name="points" type="number" min="0" value="${m.points}"></div>
+      <div><label>Минут</label><input name="minutes" type="number" min="1" value="${m.minutes}"></div>
+     </div>
+     <label>Нұсқау (оқушыларға)</label><input name="task" value="${esc(m.task)}">
+     ${['choice','listening','reading'].includes(m.type)?`<label>Ұпай ережесі: дұрыс жауап саны = ұпай</label><input name="rules" value="${esc(m.rules||'')}" placeholder="4=1, 6=2"><div class="hint">Мысалы "4=1, 6=2": 4 дұрыс болса 1 ұпай, 6 дұрыс болса 2 ұпай. Бос қалса, пропорционалды есептейді.</div>`:''}
+     ${typeFields(m,i)}</div>`).join('')}</div>
+    <div class="row"><button class="btn" id="eAdd">＋ Миссия қосу</button><button class="btn big green" id="eSave">💾 Сақтау</button><button class="btn white" id="ePlay">▶ Ойнап көру</button></div>
+   </div></div>`;
+  const read=()=>{ED.title=$('#eTitle').value.trim()||'New lesson';ED.story=$('#eStory').value;
+    $$('.mcard').forEach(c=>{const i=+c.dataset.i;const m=ED.missions[i];const v=n=>{const el=c.querySelector(`[name="${n}"]`);return el?el.value:undefined};
+      m.place=v('place');m.name=v('name');m.work=v('work');m.points=+v('points')||0;m.minutes=+v('minutes')||1;m.task=v('task');if(v('rules')!==undefined)m.rules=v('rules');
+      const t=m.type;
+      if(t==='choice')m.items=parseChoice(v('items'));
+      if(t==='listening'){m.script=v('script');m.items=parseChoice(v('items'))}
+      if(t==='reading'){m.textTitle=v('textTitle');m.text=v('text');m.items=parseChoice(v('items'));m.finds=lines(v('finds')).map(l=>{const p=l.split('|').map(s=>s.trim());return {q:p[0],key:p[1]||''}})}
+      if(t==='speaking'){m.a=lines(v('a'));m.b=lines(v('b'));m.rubric=v('rubric')}
+      if(t==='writing'){m.prompts=lines(v('prompts'));m.example=v('example');m.minSent=+v('minSent')||5;m.rubric=v('rubric')}
+      if(t==='reflection')m.items=lines(v('items'));
+      const nt=v('type');if(nt!==t){m.type=nt;Object.assign(m,blank(nt),{type:nt})}})};
+  const save=(quiet)=>{read();const bad=ED.missions.find(m=>['choice','listening'].includes(m.type)&&!m.items.length);if(bad){toast('"'+bad.place+'": сұрақ жоқ немесе формат қате');return false}
+    const k=LESSONS.findIndex(l=>l.id===ED.id);if(k>=0)LESSONS[k]=clone(ED);else LESSONS.push(clone(ED));saveL();curLessonId=ED.id;if(!quiet)toast('Сақталды ✔');return true};
+  $('#eHome').onclick=()=>{read();home()};
+  $('#eSel').onchange=e=>{curLessonId=e.target.value;editor()};
+  $('#eNew').onclick=()=>{const t=prompt('Жаңа сабақ атауы:','My topic — Game World');if(!t)return;ED={id:'l'+Date.now(),title:t,story:'Welcome to the game world! Complete the missions, collect coins and unlock the portal.',missions:['choice','listening','reading','speaking','writing','reflection'].map(blank)};LESSONS.push(clone(ED));saveL();curLessonId=ED.id;renderEditor()};
+  $('#eDup').onclick=()=>{read();ED=clone(ED);ED.id='l'+Date.now();ED.title+=' (copy)';LESSONS.push(clone(ED));saveL();curLessonId=ED.id;renderEditor();toast('Көшірме жасалды')};
+  $('#eDel').onclick=()=>{if(LESSONS.length<2){toast('Кем дегенде 1 сабақ қалу керек');return}if(!confirm('"'+ED.title+'" өшірілсін бе?'))return;LESSONS=LESSONS.filter(l=>l.id!==ED.id);saveL();curLessonId=LESSONS[0].id;editor()};
+  $('#eExp').onclick=()=>{if(!save(true))return;const b=new Blob([JSON.stringify(ED,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=(ED.title.replace(/[^\w\-]+/g,'_')||'lesson')+'.json';a.click();toast('Файл жүктелді')};
+  $('#eImp').onclick=()=>$('#eFile').click();
+  $('#eFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const l=JSON.parse(r.result);if(!l.missions)throw 0;l.id='l'+Date.now();LESSONS.push(l);saveL();curLessonId=l.id;editor();toast('Сабақ ашылды ✔')}catch(err){toast('Файл қате')}};r.readAsText(f)};
+  $('#eAdd').onclick=()=>{read();const last=ED.missions[ED.missions.length-1];const nm=blank('choice');if(last&&last.type==='reflection')ED.missions.splice(ED.missions.length-1,0,nm);else ED.missions.push(nm);renderEditor()};
+  $('#eSave').onclick=()=>save();
+  $('#ePlay').onclick=()=>{if(!save(true))return;home()};
+  $$('[data-up]').forEach(b=>b.onclick=()=>{read();const i=+b.dataset.up;if(i>0){[ED.missions[i-1],ED.missions[i]]=[ED.missions[i],ED.missions[i-1]];renderEditor()}});
+  $$('[data-dn]').forEach(b=>b.onclick=()=>{read();const i=+b.dataset.dn;if(i<ED.missions.length-1){[ED.missions[i+1],ED.missions[i]]=[ED.missions[i],ED.missions[i+1]];renderEditor()}});
+  $$('[data-rm]').forEach(b=>b.onclick=()=>{if(!confirm('Миссия өшірілсін бе?'))return;read();ED.missions.splice(+b.dataset.rm,1);renderEditor()});
+  $$('.mcard select[name="type"]').forEach(s=>s.onchange=()=>{read();renderEditor()});
+}
+function blank(t){const base={choice:{name:'Grammar Power-up',place:'Spawn Point',work:'Individual',points:1,minutes:3,rules:'',task:'Choose the correct answer.',items:[{q:'She ___ to school.',opts:['go','goes'],a:1}]},
+  listening:{name:'Listening Challenge',place:'Sound Island',work:'Group',points:2,minutes:4,rules:'',task:'Listen twice and choose True or False.',script:'Write the text here.',items:[{q:'Sentence one.',opts:['True','False'],a:0}]},
+  reading:{name:'Reading',place:'Reading Cave',work:'Individual',points:2,minutes:4,rules:'',task:'Read the text and answer.',textTitle:'Title',text:'Write the text here.',items:[],finds:[]},
+  speaking:{name:'Speaking Mission',place:'Duo Bridge',work:'Pair',points:2,minutes:4,task:'Ask and answer the questions. Then switch roles.',a:['Question 1?'],b:['Question 2?'],rubric:''},
+  writing:{name:'Writing Mission',place:'Builder\'s Lab',work:'Group',points:2,minutes:5,minSent:5,task:'Write 5–6 sentences.',prompts:['He/She …'],example:'',rubric:''},
+  reflection:{name:'Unlock the Portal',place:'Portal',work:'Individual',points:1,minutes:3,task:'Complete the sentences.',items:['Today I learned …']}}[t];return Object.assign({type:t},clone(base))}
+
+home();
+</script>
+</body>
+</html>
