@@ -182,10 +182,19 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:80}
 .mcard .hd b{margin-right:auto;font-size:1.1em}
 .hint{font-size:.8em;color:var(--muted);background:#f3f5ff;border-radius:10px;padding:.4em .7em;margin-top:.3em;white-space:pre-line}
 .toast{position:fixed;bottom:1.2em;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:.6em 1.2em;border-radius:14px;z-index:99;animation:fade .2s;max-width:90vw;text-align:center}
+#world{position:fixed;inset:0;z-index:0;display:none;background:linear-gradient(#5ec8ff,#bfe9ff 75%)}
+#world canvas{display:block;width:100%;height:100%}
+.hud{position:fixed;inset:0;pointer-events:none;z-index:2}
+.hud .topbar,.hud .hint,.hud .coinhud{pointer-events:auto}
+.hint{position:fixed;bottom:1.2em;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.88);border-radius:14px;padding:.3em .9em;font-weight:500;font-size:.85em;white-space:nowrap;box-shadow:var(--shadow)}
+.coinhud{position:fixed;right:1em;top:5em;background:#fff;border-radius:14px;padding:.2em .8em;font-weight:700;font-size:1.2em;box-shadow:var(--shadow)}
+.screen.overlay{background:rgba(190,232,255,.5);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+@media (max-width:900px){.hint{display:none}}
 </style>
 </head>
 <body>
 <div class="clouds" id="clouds"></div>
+<div id="world"></div>
 <div id="app" class="wrap"></div>
 <canvas id="fx"></canvas>
 <script>
@@ -297,7 +306,7 @@ let CONF=0;
 function stopAll(){CONF++;const c=document.getElementById('fx');if(c)c.getContext('2d').clearRect(0,0,c.width,c.height);clearInterval(timerInt);try{speechSynthesis.cancel()}catch(e){}try{REC&&REC.stop()}catch(e){}}
 
 /* ============ HOME ============ */
-function home(){stopAll();
+function home(){stopAll();worldHide();
   const L=lessonById(curLessonId);
   const teams=(G&&G.teams)||[{name:'Team 1'},{name:'Team 2'},{name:'Team 3'}];
   const cont=G&&G.lessonId===L.id&&Object.keys(G.done||{}).length;
@@ -331,58 +340,44 @@ function home(){stopAll();
 function teamsHTML(){return G.teams.map((t,i)=>`<div class="team" style="background:${t.color}">${esc(t.name)} <span class="sc">⭐ ${t.xp}</span><span class="sc">🪙 ${t.coins}</span><button data-t="${i}" data-d="-1">−</button><button data-t="${i}" data-d="1">+</button></div>`).join('')}
 function bindTeams(){$$('.team button').forEach(b=>b.onclick=()=>{const t=G.teams[+b.dataset.t];t.xp=Math.max(0,t.xp+ +b.dataset.d);saveG();if(+b.dataset.d>0)SFX.coin();$('.teams').innerHTML=teamsHTML();bindTeams()})}
 
-/* ============ MAP ============ */
-function islandPos(i,n){ // i in -1..n (n = portal)
-  if(i<0)return {x:4.5,y:80};
-  const x=15+i*(78/Math.max(1,n));const y=i%2?30:66;return {x,y:i===n?42:y}}
-function map(){stopAll();
-  const L=lessonById(G.lessonId);const n=L.missions.length-(L.missions[L.missions.length-1].type==='reflection'?1:0);
-  // reflection mission lives in the portal
-  const ms=L.missions;const nextIdx=ms.findIndex((m,i)=>!G.done[i]);
-  const pts=[islandPos(-1,n)];for(let i=0;i<=n;i++)pts.push(islandPos(i,n));
-  const allMainDone=ms.slice(0,n).every((m,i)=>G.done[i]);
-  const avPos=islandPos(G.pos,n);
-  $('#app').innerHTML=`<div class="screen">
-   <div class="topbar"><button class="btn small white" id="homeBtn">🏠</button><div class="title">${esc(L.title)}</div><div class="teams">${teamsHTML()}</div></div>
-   <div class="mapwrap"><div class="map" id="map">
-    <svg viewBox="0 0 100 56.25" preserveAspectRatio="none"><defs><linearGradient id="rb" x1="0" x2="1"><stop offset="0" stop-color="#ff4d5e"/><stop offset=".25" stop-color="#ffd23f"/><stop offset=".5" stop-color="#2ecc71"/><stop offset=".75" stop-color="#3a86ff"/><stop offset="1" stop-color="#9b5de5"/></linearGradient></defs>
-     <polyline points="${pts.map(p=>p.x+','+p.y*.5625).join(' ')}" fill="none" stroke="url(#rb)" stroke-width="1.1" stroke-dasharray="1.6 1.2" stroke-linecap="round" opacity=".9"/></svg>
-    <div class="island" style="left:4.5%;top:80%;width:7%"><div class="top" style="background:#cfd8e3"><div class="ico" style="font-size:1.6vw">🚩</div></div><div class="lbl">Start</div></div>
-    ${ms.slice(0,n).map((m,i)=>{const p=islandPos(i,n);const done=G.done[i];const locked=!done&&i!==nextIdx;
-      return `<div class="island ${done?'done':''} ${locked?'locked':''} ${i===nextIdx?'next':''}" data-i="${i}" style="left:${p.x}%;top:${p.y}%;animation-delay:-${i*.7}s">
-       <div class="lvl">LEVEL ${i+1}</div>${done?`<div class="stars">${'⭐'.repeat(Math.max(1,done.pts||0))}</div>`:''}
-       <div class="top" style="background:${ISLAND_COLORS[i%8]}"><div class="ico">${TYPES[m.type].icon}</div></div>
-       <div class="lbl">${esc(m.place)}</div></div>`}).join('')}
-    ${(()=>{const p=islandPos(n,n);return `<div class="island portal ${allMainDone?'open next':'locked'}" data-i="portal" style="left:${p.x}%;top:${p.y}%"><div class="lvl">FINAL</div><div class="top"><div class="ico">🌀</div></div><div class="lbl">${esc(ms[n]?ms[n].place:'Portal')}</div></div>`})()}
-    <div class="avatar" id="av" style="left:${avPos.x}%;top:${avPos.y-3}%"><div class="b">${avatarHTML()}</div></div>
-   </div></div></div>`;
+/* ============ 3D WORLD ============ */
+function whenWorld(){return new Promise(r=>{if(window.World3D)return r(World3D);addEventListener('world3d-ready',()=>r(window.World3D),{once:true})})}
+function worldPause(b){if(window.World3D)World3D.pause(b)}
+function worldHide(){if(window.World3D)World3D.hide()}
+async function map(){stopAll();closeModal();
+  const L=lessonById(G.lessonId);
+  $('#app').innerHTML=`<div class="hud"><div class="topbar"><button class="btn small white" id="homeBtn">🏠</button><div class="title">${esc(L.title)}</div><div class="teams">${teamsHTML()}</div></div>
+   <div class="hint">🕹 Joystick / ← ↑ → ↓ &nbsp;·&nbsp; ⤒ JUMP / Space &nbsp;·&nbsp; Stand on the <b style="color:#ff4d5e">red button</b>!</div>
+   <div class="coinhud">🪙 <span id="cc">0</span></div></div>`;
   $('#homeBtn').onclick=home;bindTeams();
-  $$('.island[data-i]').forEach(el=>el.onclick=()=>{
-    const v=el.dataset.i;
-    if(v==='portal'){if(!allMainDone){toast('Complete all missions to unlock the portal!');SFX.wrong();return}
-      if(ms[n])intro(n);else final();return}
-    const i=+v;if(!G.done[i]&&i!==nextIdx){toast('Locked! Finish Level '+(nextIdx+1)+' first');SFX.wrong();return}
-    intro(i)});
+  const W=await whenWorld();
+  W.sfx=k=>SFX[k]&&SFX[k]();
+  W.onCoin=n=>{SFX.coin();const c=$('#cc');if(c)c.textContent=n};
+  W.onFall=()=>{SFX.wrong();toast('Oops! Try again 🔁',1200)};
+  W.onButton=i=>intro(i);
+  W.onPortal=()=>{const ms=L.missions;const n=ms.length-(ms[ms.length-1]&&ms[ms.length-1].type==='reflection'?1:0);
+    if(!ms.slice(0,n).every((m,k)=>G.done[k])){toast('Complete all missions first!');SFX.wrong();return}
+    if(ms[n])intro(n);else final()};
+  W.build(L,G.done);W.show();
+  const cc=$('#cc');if(cc)cc.textContent=W.coins();
 }
 function avatarHTML(){return `<div class="av"><div class="al"></div><div class="ar"></div><div class="ll"></div><div class="lr"></div><div class="tr"></div><div class="hd"></div></div>`}
-function hopTo(i){const L=lessonById(G.lessonId);const n=L.missions.length-(L.missions[L.missions.length-1].type==='reflection'?1:0);
-  const av=$('#av');if(!av)return;const p=islandPos(Math.min(i,n),n);av.classList.add('hop');SFX.jump();setTimeout(SFX.jump,450);
-  requestAnimationFrame(()=>{av.style.left=p.x+'%';av.style.top=(p.y-3)+'%'});setTimeout(()=>av.classList.remove('hop'),950)}
 
 /* ============ mission intro ============ */
-function intro(i){const L=lessonById(G.lessonId);const m=L.missions[i];const T=TYPES[m.type];SFX.click();
+function intro(i){const L=lessonById(G.lessonId);const m=L.missions[i];const T=TYPES[m.type];SFX.click();worldPause(true);
   modal(`<h1 style="text-align:center">${T.icon} ${esc(m.place)}</h1>
    <div class="badges"><span class="tag" style="background:${T.color}">${T.label}</span><span class="tag" style="background:${WORK_COLORS[m.work]||'#888'}">${esc(m.work)} work</span><span class="tag" style="background:#1d2340">⭐ ${m.points} point${m.points>1?'s':''}</span><span class="tag" style="background:#555">⏱ ${m.minutes} min</span></div>
    <h2 style="text-align:center">${esc(m.name)}</h2><p class="task">${esc(m.task)}</p>
-   <div class="row"><button class="btn white" onclick="closeModal()">Back</button><button class="btn big green" id="goBtn">▶ GO!</button></div>`);
+   <div class="row"><button class="btn white" id="introBack">Back</button><button class="btn big green" id="goBtn">▶ GO!</button></div>`);
+  $('#introBack').onclick=()=>{closeModal();worldPause(false)};
   $('#goBtn').onclick=()=>{closeModal();mission(i)}}
 function modal(html){closeModal();const d=document.createElement('div');d.className='modal';d.id='modal';d.innerHTML=`<div class="panel">${html}</div>`;document.body.appendChild(d)}
 function closeModal(){const m=$('#modal');if(m)m.remove()}
 
 /* ============ MISSION shell ============ */
-function mission(i){stopAll();const L=lessonById(G.lessonId);const m=L.missions[i];const T=TYPES[m.type];
-  $('#app').innerHTML=`<div class="screen">
-   <div class="topbar"><button class="btn small white" id="backBtn">🗺 Map</button>
+function mission(i){stopAll();worldPause(true);const L=lessonById(G.lessonId);const m=L.missions[i];const T=TYPES[m.type];
+  $('#app').innerHTML=`<div class="screen overlay">
+   <div class="topbar"><button class="btn small white" id="backBtn">🎮 Game</button>
     <div class="title">${T.icon} Level ${i+1} · ${esc(m.place)} <span class="tag" style="background:${T.color}">${T.label}</span> <span class="tag" style="background:${WORK_COLORS[m.work]||'#888'}">${esc(m.work)}</span></div>
     <div class="timer" id="timer"></div><div class="teams">${teamsHTML()}</div></div>
    <div class="mission"><div class="task">${esc(m.task)}</div><div class="panel" id="mbody"></div></div></div>`;
@@ -522,15 +517,15 @@ function score(i,res){stopAll();const L=lessonById(G.lessonId);const m=L.mission
     pick.forEach(k=>{G.teams[k].xp+=pts;G.teams[k].coins+=res.correct});lastPick=[...pick];
     const prev=G.done[i];G.done[i]={pts:Math.max(pts,prev?prev.pts:0)};const firstTime=!prev;if(firstTime)G.pos=i;saveG();closeModal();SFX.win();
     if(res.final){final();return}
-    map();if(firstTime){const av=$('#av');const L2=lessonById(G.lessonId);const n=L2.missions.length-(L2.missions[L2.missions.length-1].type==='reflection'?1:0);const p=islandPos(i-1,n);av.style.transition='none';av.style.left=p.x+'%';av.style.top=(p.y-3)+'%';av.offsetWidth;av.style.transition='';setTimeout(()=>hopTo(i),250)}}}
+    map().then(()=>{if(firstTime&&i+1<lessonById(G.lessonId).missions.length)toast('🔓 Gate open! Go on to Level '+(i+2),2500)})}}
 
 /* ============ final ============ */
-function final(){stopAll();const L=lessonById(G.lessonId);const sorted=[...G.teams].sort((a,b)=>b.xp-a.xp||b.coins-a.coins);const max=L.missions.reduce((s,m)=>s+(+m.points||0),0);
+function final(){stopAll();worldHide();const L=lessonById(G.lessonId);const sorted=[...G.teams].sort((a,b)=>b.xp-a.xp||b.coins-a.coins);const max=L.missions.reduce((s,m)=>s+(+m.points||0),0);
   $('#app').innerHTML=`<div class="screen home">
    <div class="logo">🌀 PORTAL UNLOCKED!<small>${esc(L.title)}</small></div>
    <div class="panel"><h2>🏆 ${esc(sorted[0].name)} wins!</h2>
     <div class="board">${sorted.map((t,k)=>`<div class="brow" style="background:${t.color}"><span>${['🥇','🥈','🥉'][k]||'🏅'}</span><span class="n">${esc(t.name)}</span><span>⭐ ${t.xp} / ${max}</span><span>🪙 ${t.coins}</span></div>`).join('')}</div></div>
-   <div class="row"><button class="btn white" id="mapBtn">🗺 Map</button><button class="btn big green" id="homeBtn">🏠 Home</button></div></div>`;
+   <div class="row"><button class="btn white" id="mapBtn">🎮 Game</button><button class="btn big green" id="homeBtn">🏠 Home</button></div></div>`;
   $('#mapBtn').onclick=map;$('#homeBtn').onclick=home;SFX.win();confetti()}
 function confetti(){const c=$('#fx'),x=c.getContext('2d');c.width=innerWidth;c.height=innerHeight;const P=Array.from({length:220},()=>({x:Math.random()*c.width,y:-20-Math.random()*c.height*.6,vx:(Math.random()-.5)*4,vy:2+Math.random()*4,r:Math.random()*6,c:TEAM_COLORS[Math.floor(Math.random()*6)],a:Math.random()*6}));let f=0;const id=CONF;
   (function t(){if(id!==CONF)return;x.clearRect(0,0,c.width,c.height);P.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.a+=.1;x.save();x.translate(p.x,p.y);x.rotate(p.a);x.fillStyle=p.c;x.fillRect(-5,-3,10,6);x.restore()});if(++f<260)requestAnimationFrame(t);else x.clearRect(0,0,c.width,c.height)})()}
@@ -560,7 +555,7 @@ function typeFields(m,i){const t=m.type;
   if(t==='reflection')return `<label>Exit ticket сөйлемдері (әр жол = 1)</label><textarea name="items" rows="3" style="font-family:inherit">${esc((m.items||[]).join('\n'))}</textarea><div class="hint">Бұл миссия соңғы порталда болады (тізімде ең соңында тұрса).</div>`;
   return ''}
 let ED=null; // working copy
-function editor(){stopAll();ED=clone(lessonById(curLessonId));renderEditor()}
+function editor(){stopAll();worldHide();ED=clone(lessonById(curLessonId));renderEditor()}
 function renderEditor(){
   $('#app').innerHTML=`<div class="screen editor">
    <div class="topbar" style="width:100%"><button class="btn small white" id="eHome">🏠</button><div class="title">👩‍🏫 Мұғалім беті</div>
@@ -624,5 +619,6 @@ function blank(t){const base={choice:{name:'Grammar Power-up',place:'Spawn Point
 
 home();
 </script>
+<script type="module" src="world3d.js?v=9"></script>
 </body>
 </html>
